@@ -37,6 +37,7 @@ const trialMessage = (trial) => {
   return response;
 };
 client.on('message', async (message) => {
+  if (!config.allowedChannels.includes(message.channel.id)) return;
   if (message.author.bot) return;
   if (message.content.match('\\$showTrials')) {
     let response = '';
