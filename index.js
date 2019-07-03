@@ -68,9 +68,18 @@ client.on('message', async (message) => {
   if (message.content.match('\\$createTrial (.*)')) {
     const newTrial = {};
     // Create new invite link
+
+    const roleName = message.content.match('\\$createTrial (.*)')[1];
+
+    const role = message.guild.roles.find(x => x.name === roleName);
+    if (role === null) {
+      message.reply(`Role ${roleName} does not exist. Aborting`);
+      return;
+    }
+
     message.channel.createInvite({ maxAge: 0, unique: true }).then((invite) => {
       // set trial properties
-      newTrial.role = message.content.match('\\$createTrial (.*)')[1];
+      newTrial.role = roleName;
       newTrial.id = message.id;
       newTrial.invite = invite.toString();
       newTrial.inviteCode = invite.code;
