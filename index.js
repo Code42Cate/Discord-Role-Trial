@@ -54,11 +54,17 @@ const stopTrialHandler = (message) => {
       message.reply(`${trials[id].role} doesn't exist`);
       return;
     }
+    // find all users with the trial role and then remove it
+    const trialUsers = message.guild.members.filter(x => x.roles.some(y => y.name === trials[id].role));
+    trialUsers.forEach(guildMember => guildMember.removeRole(role));
+
+    // You could also just delete the role:
+    /*
     role.delete().then(() => {
       message.reply('Successfully removed role!');
     }).catch((err) => {
       message.reply(err);
-    });
+    }); */
     trials[id] = undefined;
   } else {
     message.reply('I don\'t think this Trial exists');
