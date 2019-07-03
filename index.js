@@ -36,69 +36,84 @@ const trialMessage = (trial) => {
   response += `Created at ${trial.createdAt}\n\n`;
   return response;
 };
-client.on('message', async (message) => {
-  if (!config.allowedChannels.includes(message.channel.id)) return;
-  if (message.author.bot) return;
-  if (message.content.match('\\$showTrials')) {
-    let response = '';
-    Object.keys(trials).forEach((id) => {
-      response += trialMessage(trials[id]);
-    });
-    message.reply(toCodeBlock(response));
-  }
-  if (message.content.match('\\$stopTrial (.*)')) {
-    const id = message.content.match('\\$stopTrial (.*)')[1];
-    if (trials[id] !== undefined) {
-      message.reply(`Stopping Trial ${id}\nRemoving role ${trials[id].role} from ${trials[id].uses} users`);
-      const role = message.guild.roles.find(x => x.name === trials[id].role);
-      if (role === null || undefined) {
-        message.reply(`${trials[id].role} doesn't exist`);
-        return;
-      }
-      role.delete().then(() => {
-        message.reply('Successfully removed role!');
-      }).catch((err) => {
-        message.reply(err);
-      });
-      trials[id] = undefined;
-    } else {
-      message.reply('I don\'t think this Trial exists');
-    }
-  }
-  if (message.content.match('\\$createTrial (.*)')) {
-    const newTrial = {};
-    // Create new invite link
 
-    const roleName = message.content.match('\\$createTrial (.*)')[1];
+const showTrialsHandler = (message) => {
+  let response = '';
+  Object.keys(trials).forEach((id) => {
+    response += trialMessage(trials[id]);
+  });
+  message.reply(toCodeBlock(response));
+};
 
-    const role = message.guild.roles.find(x => x.name === roleName);
-    if (role === null) {
-      message.reply(`Role ${roleName} does not exist. Aborting`);
+const stopTrialHandler = (message) => {
+  const id = message.content.match('\\$stopTrial (.*)')[1];
+  if (trials[id] !== undefined) {
+    message.reply(`Stopping Trial ${id}\nRemoving role ${trials[id].role} from ${trials[id].uses} users`);
+    const role = message.guild.roles.find(x => x.name === trials[id].role);
+    if (role === null || undefined) {
+      message.reply(`${trials[id].role} doesn't exist`);
       return;
     }
-
-    message.channel.createInvite({ maxAge: 0, unique: true }).then((invite) => {
-      // set trial properties
-      newTrial.role = roleName;
-      newTrial.id = message.id;
-      newTrial.invite = invite.toString();
-      newTrial.inviteCode = invite.code;
-      newTrial.uses = 0;
-      newTrial.createdAt = new Date().toString();
-      // set newTrial in global trials object
-      trials[newTrial.id] = newTrial;
-      // create response
-      let response = trialMessage(newTrial);
-      response += `Trial is valid until you use the command: $stopTrial ${newTrial.id}\n`;
-      // load new invite
-      updateInvites();
-      // save new trial object to file in case of a crash
-      message.reply(toCodeBlock(response));
+    role.delete().then(() => {
+      message.reply('Successfully removed role!');
     }).catch((err) => {
-      console.log(err);
+      message.reply(err);
     });
+    trials[id] = undefined;
+  } else {
+    message.reply('I don\'t think this Trial exists');
+  }
+};
+
+const createTrialHandler = (message) => {
+  const newTrial = {};
+  // Create new invite link
+
+  const roleName = message.content.match('\\$createTrial (.*)')[1];
+
+  const role = message.guild.roles.find(x => x.name === roleName);
+  if (role === null) {
+    message.reply(`Role ${roleName} does not exist. Aborting`);
+    return;
+  }
+
+  message.channel.createInvite({ maxAge: 0, unique: true }).then((invite) => {
+    // set trial properties
+    newTrial.role = roleName;
+    newTrial.id = message.id;
+    newTrial.invite = invite.toString();
+    newTrial.inviteCode = invite.code;
+    newTrial.uses = 0;
+    newTrial.createdAt = new Date().toString();
+    // set newTrial in global trials object
+    trials[newTrial.id] = newTrial;
+    // create response
+    let response = trialMessage(newTrial);
+    response += `Trial is valid until you use the command: $stopTrial ${newTrial.id}\n`;
+    // load new invite
+    updateInvites();
+    // save new trial object to file in case of a crash
+    message.reply(toCodeBlock(response));
+  }).catch((err) => {
+    console.log(err);
+  });
+};
+
+client.on('message', async (message) => {
+  if (!config.allowedChannels.includes(message.channel.id)) return;
+  // we dont want to listen to our own messages (will break stuff because of the $stopTrial explanation)
+  if (message.author.bot) return;
+  if (message.content.match('\\$showTrials')) {
+    showTrialsHandler(message);
+  }
+  if (message.content.match('\\$stopTrial (.*)')) {
+    stopTrialHandler(message);
+  }
+  if (message.content.match('\\$createTrial (.*)')) {
+    createTrialHandler(message);
   }
 });
+
 client.on('guildMemberAdd', (member) => {
   // To compare, we need to load the current invite list.
   member.guild.fetchInvites().then((guildInvites) => {
@@ -108,9 +123,7 @@ client.on('guildMemberAdd', (member) => {
     invites[member.guild.id] = guildInvites;
     // Look through the invites, find the one for which the uses went up.
     const invite = guildInvites.find(i => ei.get(i.code).uses < i.uses);
-
-    // eslint-disable-next-line no-restricted-syntax
-    for (const id in trials) {
+    Object.keys(trials).forEach((id) => {
       if (trials[id].inviteCode === invite.code) {
         const role = member.guild.roles.find(x => x.name === trials[id].role);
         trials[id].uses += 1;
@@ -119,7 +132,7 @@ client.on('guildMemberAdd', (member) => {
           console.error(err);
         });
       }
-    }
+    });
   });
 });
 client.login(config.token);
